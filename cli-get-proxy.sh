@@ -1,6 +1,7 @@
 #! /bin/bash
 
 INTERACTIVE=YES
+export WATTSON_URL=https://watts-dev.data.kit.edu
 
 input=$@
 for i in "$@";do
@@ -13,31 +14,39 @@ for i in "$@";do
       #INTERACTIVE=YES
       #shift
       #;;
-    -p=*)
-      PROVIDER="${i#*=}"
+    -p)
+      PROVIDER="$2"
       shift
       ;;
-    -t=*)
-      TOKEN="${i#*=}"
+    -lsprov)
+      SHOW_PROVIDERS=YES
+      ;;
+    -watts)
+      WATTSON_URL="$2"
       shift
       ;;
-    *)
-      WRONG=YES
-      shift
-      ;;
+    #-t=*)
+      #TOKEN="${i#*=}"
+      #shift
+      #;;
+    #*)
+      #WRONG=YES
+      #shift
+      #;;
   esac
 done
 
 function print_help () {
     echo -e ""
-    echo "Usage: cmd_line_get_proxy [option]"
+    echo "Usage: $0 [option]"
     echo -e "Options are:"
     echo -e ""
-    echo -e "\e[33m      -h: \033[1;m print this message and exit"
-    #echo -e "\e[33m      -i: \033[1;m interactive, promts user for provider and access token"
-    echo -e "\e[33m      -p=: \033[1;m provider name"
-    echo -e "\e[33m      -t=: \033[1;m token value"
-    echo -e " when using interactive mode, -p and -t values are ignored"
+    echo -e "\e[33m      -h:      \033[1;m print this message and exit"
+    echo -e "\e[33m      -p:      \033[1;m provider name"
+    echo -e "\e[33m      -lsprov: \033[1;m show available providers"
+    echo -e "\e[33m      -watts:  \033[1;m URL to reach WaTTS. (Default: $WATTSON_URL)"
+    #echo -e "\e[33m      -t=: \033[1;m token value"
+    echo -e '\n  The OIDC Token will be taken from the $OIDC environment variable, if available. Otherwise you will be promted.\n' 
 }
 
 
@@ -56,7 +65,6 @@ function check_wattson () {
 }
 
 function show_providers () {
-
   echo "checking for providers"
   PROVS=`wattson lsprov | grep Provider | awk '{print $2}'`
   PROVS=($PROVS)
@@ -69,6 +77,10 @@ function show_providers () {
     echo "${PROVS[$j]}"
   done
   echo "-----"
+}
+
+function show_providers_and_select () {
+  show_providers
   echo -e "input the desired provider (WaTTS Issuer Id) with \e[33m ready \033[1;m status "
   read oidcProvider
   if [[ ${PROVS[@]} != *$oidcProvider* ]]; then
@@ -98,13 +110,13 @@ function get_proxy () {
   userid=`id -u`
 
   # echo "remove existing proxy with name x509up_u$userid in current folder"
-  echo "check and remove old cert"
-  if [ -f /tmp/x509up_u$userid ]; then
-    rm /tmp/x509up_u$userid
-  fi
-  if [ -f x509up_u$userid ]; then
-    rm x509up_u$userid
-  fi
+  #echo "check and remove old cert"
+  #if [ -f /tmp/x509up_u$userid ]; then
+    #rm /tmp/x509up_u$userid
+  #fi
+  #if [ -f x509up_u$userid ]; then
+    #rm x509up_u$userid
+  #fi
   echo "request certificate from WaTTS"
   wattson -j request $pluginName | jq -r .credential.entries[0].value > /tmp/x509up_u$userid
   echo "done"
@@ -128,11 +140,10 @@ function get_proxy () {
 
 function main () {
 
-  export WATTSON_URL=https://watts-dev.data.kit.edu
   check_wattson
   if [[ "$INTERACTIVE" ]]; then
     if [ -z "$PROVIDER" ]; then
-        show_providers
+        show_providers_and_select
         export WATTSON_ISSUER=$oidcProvider
     else
         export WATTSON_ISSUER=$PROVIDER
@@ -185,6 +196,10 @@ fi
     #print_help
     #exit 0
 #fi
+if [ "x$SHOW_PROVIDERS" == "xYES" ]; then
+    show_providers
+    exit 0
+fi
 main
 
 
