@@ -1,5 +1,7 @@
 #! /bin/bash
 
+INTERACTIVE=YES
+
 input=$@
 for i in "$@";do
   case $i in
@@ -7,10 +9,10 @@ for i in "$@";do
       SHOW_USAGE=YES
       shift
       ;;
-    -i)
-      INTERACTIVE=YES
-      shift
-      ;;
+    #-i)
+      #INTERACTIVE=YES
+      #shift
+      #;;
     -p=*)
       PROVIDER="${i#*=}"
       shift
@@ -32,7 +34,7 @@ function print_help () {
     echo -e "Options are:"
     echo -e ""
     echo -e "\e[33m      -h: \033[1;m print this message and exit"
-    echo -e "\e[33m      -i: \033[1;m interactive, promts user for provider and access token"
+    #echo -e "\e[33m      -i: \033[1;m interactive, promts user for provider and access token"
     echo -e "\e[33m      -p=: \033[1;m provider name"
     echo -e "\e[33m      -t=: \033[1;m token value"
     echo -e " when using interactive mode, -p and -t values are ignored"
@@ -129,14 +131,29 @@ function main () {
   export WATTSON_URL=https://watts-dev.data.kit.edu
   check_wattson
   if [[ "$INTERACTIVE" ]]; then
-    show_providers
-    export WATTSON_ISSUER=$oidcProvider
-    input_access_token
-    export WATTSON_TOKEN=$OIDC_AT
+    if [ -z "$PROVIDER" ]; then
+        show_providers
+        export WATTSON_ISSUER=$oidcProvider
+    else
+        export WATTSON_ISSUER=$PROVIDER
+    fi
+    if [ -z $OIDC ]; then
+        input_access_token
+        export WATTSON_TOKEN=$OIDC_AT
+        echo inp
+    else
+        echo 'Using OIDC Access Token from ENV $OIDC'
+        export WATTSON_TOKEN=$OIDC
+    fi
   else
     if [ -z "$TOKEN" ]; then
-      echo "TOKEN is empty, exiting"
-      exit
+      if [ -z "$OIDC" ]; then
+          echo "TOKEN is empty, exiting"
+          exit
+      else
+          echo 'Using OIDC Access Token from ENV $OIDC'
+          TOKEN=$OIDC
+      fi
     fi
     if [ -z "$PROVIDER" ]; then
       echo "issuer (provider) is empty, exiting"
@@ -164,11 +181,10 @@ if [ "$WRONG" ]; then
     echo -e "\e[31m  !!!WRONG ARGUMENT!!! check cmd_line_get_proxy -h \033[1;m"
     exit
 fi
-if [ -z "$input" ]; then
-    echo "Usage: cmd_line_get_proxy [options] "
-    echo "Run cmd_line_get_proxy -h for detailed help "
-    exit 0
-fi
+#if [ -z "$input" ]; then
+    #print_help
+    #exit 0
+#fi
 main
 
 
