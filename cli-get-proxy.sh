@@ -4,9 +4,10 @@ INTERACTIVE=YES
 export WATTSON_URL=https://watts-dev.data.kit.edu
 
 input=$@
-for i in "$@";do
-  case $i in
+while :; do
+  case $1 in
     -h)
+      USE=YES
       SHOW_USAGE=YES
       shift
       ;;
@@ -15,13 +16,16 @@ for i in "$@";do
       #shift
       #;;
     -p)
+      USE=YES
       PROVIDER="$2"
       shift
       ;;
     -lsprov)
+      USE=YES
       SHOW_PROVIDERS=YES
       ;;
     -watts)
+      USE=YES
       WATTSON_URL="$2"
       shift
       ;;
@@ -33,19 +37,28 @@ for i in "$@";do
       #WRONG=YES
       #shift
       #;;
+    *)               # Default case: If no more options then break out of the loop.
+      break
   esac
+  shift
 done
+
+if [[ ! -z "$input" && -z $USE ]]; then
+  WRONG=YES
+fi
 
 function print_help () {
     echo -e ""
-    echo "Usage: $0 [option]"
-    echo -e "Options are:"
+    echo "  Usage: $0 [option]"
+    echo -e "  Options are:"
     echo -e ""
     echo -e "\e[33m      -h:      \033[1;m print this message and exit"
     echo -e "\e[33m      -p:      \033[1;m provider name"
     echo -e "\e[33m      -lsprov: \033[1;m show available providers"
     echo -e "\e[33m      -watts:  \033[1;m URL to reach WaTTS. (Default: $WATTSON_URL)"
-    #echo -e "\e[33m      -t=: \033[1;m token value"
+    echo -e "  You can combine \e[33m-p\033[1;m and \e[33m-watts\033[1;m." 
+    echo -e "  Arguments \e[33mlsprov\033[1;m and \e[33mh\033[1;m have priority."
+    echo -e "  Wrong arguments will be ignored, or shown an error."
     echo -e '\n  The OIDC Token will be taken from the $OIDC environment variable, if available. Otherwise you will be promted.\n' 
 }
 
@@ -118,7 +131,13 @@ function get_proxy () {
     #rm x509up_u$userid
   #fi
   echo "request certificate from WaTTS"
-  wattson -j request $pluginName | jq -r .credential.entries[0].value > /tmp/x509up_u$userid
+  result=`wattson -j request $pluginName`
+  error_val=`echo $result | grep -i error`
+  if [[ ! -z $error_val ]]; then
+    echo "Received '$error_val'. Wrong access token? Exiting..."
+    exit 1
+  fi
+  echo $result | jq -r .credential.entries[0].value > /tmp/x509up_u$userid
   echo "done"
   chmod 600 /tmp/x509up_u$userid
   echo "checking for grid-proxy-info"
@@ -146,12 +165,17 @@ function main () {
         show_providers_and_select
         export WATTSON_ISSUER=$oidcProvider
     else
+        PROVS=`wattson lsprov | grep Provider | awk '{print $2}'`
+        PROVS=($PROVS)
+        if [[ ${PROVS[@]} != *$PROVIDER* ]]; then
+          echo "wrong provider, exiting"
+          exit 1
+        fi
         export WATTSON_ISSUER=$PROVIDER
     fi
     if [ -z $OIDC ]; then
         input_access_token
         export WATTSON_TOKEN=$OIDC_AT
-        echo inp
     else
         echo 'Using OIDC Access Token from ENV $OIDC'
         export WATTSON_TOKEN=$OIDC
@@ -173,7 +197,7 @@ function main () {
     PROVS=($PROVS)
     if [[ ${PROVS[@]} != *$PROVIDER* ]]; then
       echo "wrong provider, exiting"
-      exit
+      exit 1
     fi
     export WATTSON_TOKEN=$TOKEN
     export WATTSON_ISSUER=$PROVIDER
@@ -189,8 +213,8 @@ if [ "$SHOW_USAGE" ]; then
     exit 0
 fi
 if [ "$WRONG" ]; then
-    echo -e "\e[31m  !!!WRONG ARGUMENT!!! check cmd_line_get_proxy -h \033[1;m"
-    exit
+    echo -e "\e[31m!!!WRONG ARGUMENT!!! check $0 -h \033[1;m"
+    exit 1
 fi
 #if [ -z "$input" ]; then
     #print_help
