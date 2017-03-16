@@ -7,7 +7,7 @@ using [WaTTS](https://watts-dev.data.kit.edu).
 
 **WaTTS** creates credentials for services that do not natively support OpenID Connect.
 In this example, in order to receive a proxy certificate, this script relies on
-**WaTTS** and *X509_RCauth_Pilot*  plugin to obtain a proxy certificate.
+**WaTTS** and *X509_RCauth_Pilot*  plugin.
 
 More info can be found when running:
 
