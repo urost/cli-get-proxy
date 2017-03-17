@@ -56,10 +56,10 @@ function print_help () {
     echo -e "\e[33m      -p:      \033[1;m provider name"
     echo -e "\e[33m      -lsprov: \033[1;m show available providers"
     echo -e "\e[33m      -watts:  \033[1;m URL to reach WaTTS. (Default: $WATTSON_URL)"
-    echo -e "  You can combine \e[33m-p\033[1;m and \e[33m-watts\033[1;m." 
+    echo -e "  You can combine \e[33m-p\033[1;m and \e[33m-watts\033[1;m."
     echo -e "  Arguments \e[33mlsprov\033[1;m and \e[33mh\033[1;m have priority."
     echo -e "  Wrong arguments will be ignored, or shown an error."
-    echo -e '\n  The OIDC Token will be taken from the $OIDC environment variable, if available. Otherwise you will be promted.\n' 
+    echo -e '\n  The OIDC Token will be taken from the $OIDC environment variable, if available. Otherwise you will be promted.\n'
 }
 
 
@@ -69,9 +69,9 @@ function check_wattson () {
 
   if [ -z "$executable" ]; then
     echo "you don't have wattson app installed!!"
-    echo "please clone https://github.com/indigo-dc/wattson"
-    echo "build and place the wattson executable in the PATH"
-    echo "build instructions: https://indigo-dc.gitbooks.io/wattson/content/admin.html"
+    echo "plase download a package or the binary from"
+    echo "https://github.com/indigo-dc/wattson/releases/latest"
+    echo "and install the package or copy the binary into your $PATH"
     exit
   fi
 
@@ -225,6 +225,3 @@ if [ "x$SHOW_PROVIDERS" == "xYES" ]; then
     exit 0
 fi
 main
-
-
-
