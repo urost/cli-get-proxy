@@ -132,15 +132,7 @@ function get_proxy () {
 
   userid=`id -u`
 
-  # echo "remove existing proxy with name x509up_u$userid in current folder"
-  #echo "check and remove old cert"
-  #if [ -f /tmp/x509up_u$userid ]; then
-    #rm /tmp/x509up_u$userid
-  #fi
-  #if [ -f x509up_u$userid ]; then
-    #rm x509up_u$userid
-  #fi
-  echo "request certificate from WaTTS"
+  echo "Requesting certificate from WaTTS"
   result=`wattson -j request $pluginName`
   error_val=`echo $result | grep -i error`
   if [[ ! -z $error_val ]]; then
@@ -149,27 +141,36 @@ function get_proxy () {
     exit 1
   fi
   echo $result | jq -r .credential.entries[0].value > /tmp/x509up_u$userid
-  echo "done"
   chmod 600 /tmp/x509up_u$userid
-  echo "checking for grid-proxy-info"
+  echo "Certificate received and save as /tmp/x509up_u$userid"
+  echo "Checking whether grid-proxy-info is present"
   local executable=`which grid-proxy-info`
 
   if [ -z "$executable" ]; then
     echo "it seems you don't have grid utils"
     echo "on Debian OS' it's usually globus-proxy-utils package"
     echo "stopping the script without running grid-proxy-info "
-    echo "your proxy cert is x509up_u$userid in $PWD"
-    exit
+    echo "your proxy cert is /tmp/x509up_u$userid"
+    exit 0
   fi
   echo "grid-proxy-init found"
-  echo "running grid-proxy-info"
+  echo "Running grid-proxy-info"
   grid-proxy-info
 
 }
 
 function remove_certificate () {
   echo "Removing certificate.."
-  result=`wattson -j lscred | jq -r .credential_list `
+  # result=`wattson -j lscred | jq -r .credential_list `
+  result=`wattson -j lscred`
+  error_val=`echo $result | grep -i error`
+  if [[ ! -z $error_val ]]; then
+    echo -e "\e[101m$error_val \033[1;m"
+    echo "Exiting.."
+    exit 1
+  fi
+
+  result=`echo $result | jq -r .credential_list`
   length=`echo $result | jq length`
   if [[ "$length" == "0" ]]; then
     echo "No credentials stored, exiting.."
@@ -179,11 +180,9 @@ function remove_certificate () {
   echo "get credential id"
   for ((j=0; j<$length;j++)); do
     serviceId=`echo $result | jq -r .[$j].service_id`
-    # echo "$serviceId"
-    # echo "$pluginName"
     if [[ "$serviceId" == "$pluginName"  ]]; then
       credId=`echo $result | jq -r .[$j].cred_id`
-      echo "cred id is:" $credId
+      # echo "cred id is:" $credId
       break
     fi
 
@@ -192,7 +191,7 @@ function remove_certificate () {
 
   result_revoke=`wattson -j revoke $credId`
   # echo "$result_revoke"
-  echo "Credential revoked"
+  echo "Certificate removed"
 
 } 
 
