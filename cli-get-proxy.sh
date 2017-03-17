@@ -2,6 +2,7 @@
 
 INTERACTIVE=YES
 export WATTSON_URL=https://watts-dev.data.kit.edu
+pluginName="X509_RCauth_Pilot"
 
 input=$@
 while :; do
@@ -15,6 +16,11 @@ while :; do
       #INTERACTIVE=YES
       #shift
       #;;
+    --remove)
+      USE=YES
+      REMOVE=YES
+      # shift
+      ;;
     -p)
       USE=YES
       PROVIDER="$2"
@@ -72,7 +78,12 @@ function check_wattson () {
     echo "plase download a package or the binary from"
     echo "https://github.com/indigo-dc/wattson/releases/latest"
     echo "and install the package or copy the binary into your $PATH"
-    exit
+    exit 1
+  fi
+  executable=`which jq`
+  if [ -z "$executable" ]; then
+    echo "Please install jq, it's needed to parse json. Exiting..."
+    exit 1
   fi
 
 }
@@ -97,7 +108,7 @@ function show_providers_and_select () {
   echo -e "input the desired provider (WaTTS Issuer Id) with \e[33m ready \033[1;m status "
   read oidcProvider
   if [[ ${PROVS[@]} != *$oidcProvider* ]]; then
-    echo "wrong provider, exiting"
+    echo -e "\e[91mwrong provider, exiting\033[1m"
     exit
   fi
 
@@ -109,7 +120,7 @@ function input_access_token () {
   echo "Paste your OIDC access token, that correspond to correct issuer, in this case "$WATTSON_ISSUER
   read OIDC_AT
   if [ -z "$OIDC_AT" ]; then
-    echo "Access token is empty, something is wrong, exiting..."
+    echo -e "\e[93mAccess token is empty, something is wrong, exiting...\033[1;m"
     exit
   fi
   export OIDC_AT
@@ -118,7 +129,6 @@ function input_access_token () {
 
 function get_proxy () {
 
-  pluginName="X509_RCauth_Pilot"
 
   userid=`id -u`
 
@@ -134,7 +144,8 @@ function get_proxy () {
   result=`wattson -j request $pluginName`
   error_val=`echo $result | grep -i error`
   if [[ ! -z $error_val ]]; then
-    echo "Received '$error_val'. Wrong access token? Exiting..."
+    echo -e "\e[101m$error_val \033[1;m"
+    echo "Exiting.."
     exit 1
   fi
   echo $result | jq -r .credential.entries[0].value > /tmp/x509up_u$userid
@@ -156,6 +167,34 @@ function get_proxy () {
 
 }
 
+function remove_certificate () {
+  echo "Removing certificate.."
+  result=`wattson -j lscred | jq -r .credential_list `
+  length=`echo $result | jq length`
+  if [[ "$length" == "0" ]]; then
+    echo "No credentials stored, exiting.."
+    exit 0
+  fi
+  # serviceId=`echo $result | jq -r .credential_list[0].serviceId`
+  echo "get credential id"
+  for ((j=0; j<$length;j++)); do
+    serviceId=`echo $result | jq -r .[$j].service_id`
+    # echo "$serviceId"
+    # echo "$pluginName"
+    if [[ "$serviceId" == "$pluginName"  ]]; then
+      credId=`echo $result | jq -r .[$j].cred_id`
+      echo "cred id is:" $credId
+      break
+    fi
+
+  done
+
+
+  result_revoke=`wattson -j revoke $credId`
+  # echo "$result_revoke"
+  echo "Credential revoked"
+
+} 
 
 function main () {
 
@@ -168,7 +207,7 @@ function main () {
         PROVS=`wattson lsprov | grep Provider | awk '{print $2}'`
         PROVS=($PROVS)
         if [[ ${PROVS[@]} != *$PROVIDER* ]]; then
-          echo "wrong provider, exiting"
+          echo -e "\e[91mwrong provider, exiting\033[1m"
           exit 1
         fi
         export WATTSON_ISSUER=$PROVIDER
@@ -183,7 +222,7 @@ function main () {
   else
     if [ -z "$TOKEN" ]; then
       if [ -z "$OIDC" ]; then
-          echo "TOKEN is empty, exiting"
+          echo -e "\e[93mTOKEN is empty, exiting\033[1;m"
           exit
       else
           echo 'Using OIDC Access Token from ENV $OIDC'
@@ -196,11 +235,16 @@ function main () {
     PROVS=`wattson lsprov | grep Provider | awk '{print $2}'`
     PROVS=($PROVS)
     if [[ ${PROVS[@]} != *$PROVIDER* ]]; then
-      echo "wrong provider, exiting"
+      echo -e "\e[91mwrong provider, exiting\033[1m"
       exit 1
     fi
     export WATTSON_TOKEN=$TOKEN
     export WATTSON_ISSUER=$PROVIDER
+  fi
+
+  if [[ $REMOVE ]]; then
+    remove_certificate
+    exit 0
   fi
 
   get_proxy
